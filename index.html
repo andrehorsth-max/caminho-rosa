@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Caminho Rosa — Quiz sobre Câncer de Mama</title>
+  <style>
+    :root{--bg:#fff7fb;--pink1:#f8c8dc;--pink2:#f4a0c2;--accent:#c85a8a;--card:#ffffff}
+    *{box-sizing:border-box;font-family:Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial}
+    body{margin:0;background:linear-gradient(180deg,var(--bg),#fff);color:#222;padding:18px}
+    .wrap{max-width:860px;margin:12px auto;background:var(--card);border-radius:14px;padding:18px;box-shadow:0 6px 30px rgba(200,90,140,.08)}
+    header{display:flex;gap:12px;align-items:center}
+    .logo{width:72px;height:72px;border-radius:12px;background:linear-gradient(135deg,var(--pink1),var(--pink2));display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:18px}
+    h1{margin:0;font-size:20px}
+    p.lead{margin:6px 0 14px;color:#444}
+
+    .board{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
+    .cell{width:calc(10% - 7px);min-width:56px;background:#fff;border-radius:8px;padding:10px;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+    .cell.locked{opacity:.25}
+    .cell.done{background:linear-gradient(180deg,#fff,#ffeef7);border:2px solid var(--accent)}
+
+    .card{background:#fff;padding:14px;border-radius:10px;box-shadow:0 6px 18px rgba(0,0,0,.04);margin-top:10px}
+    .question{font-weight:600;margin-bottom:8px}
+    .answers{display:flex;flex-direction:column;gap:8px}
+    .btn{padding:10px 12px;border-radius:8px;border:1px solid rgba(0,0,0,.06);background:#fafafa;cursor:pointer;text-align:left}
+    .btn.correct{border-color:green;background:#eaf9ef}
+    .btn.wrong{border-color:#f2a0a0;background:#fff0f0}
+
+    .controls{display:flex;gap:8px;align-items:center;margin-top:10px}
+    .small{font-size:13px;color:#666}
+    .audioBtn{padding:8px 10px;border-radius:8px;background:var(--pink1);color:#fff;border:none}
+    .download{display:inline-block;margin-left:auto;padding:10px 12px;background:var(--accent);color:#fff;border-radius:8px;text-decoration:none}
+
+    .feedback{margin-top:12px;color:#444}
+    footer{margin-top:14px;color:#666;font-size:13px}
+
+    @media(max-width:640px){.cell{width:calc(20% - 6px)}header{gap:10px}.logo{width:56px;height:56px}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="logo">Caminho<br>Rosa</div>
+      <div>
+        <h1>Caminho Rosa — Quiz sobre Câncer de Mama</h1>
+        <p class="lead">Responda 10 perguntas. A cada acerto você avança uma casa no tabuleiro. Ao completar, baixe o folder informativo.</p>
+      </div>
+    </header>
+
+    <div class="board" id="board" aria-hidden="false" role="list"></div>
+
+    <div class="card" id="gameCard">
+      <div class="question" id="questionText">Carregando perguntas...</div>
+      <div class="answers" id="answers"></div>
+
+      <div class="controls">
+        <button id="playAudio" class="audioBtn">▶️ Ouvir pergunta</button>
+        <button id="replayAudio" class="audioBtn" style="background:#aaa">🔁 Ouvir novamente</button>
+        <div class="small">Acertos: <span id="score">0</span>/10</div>
+        <a id="downloadLink" class="download" style="display:none" href="#" download>Baixar Folder (PDF)</a>
+      </div>
+
+      <div class="feedback" id="feedback"></div>
+    </div>
+
+    <footer>
+      <div>Se preferir, peça ajuda no balcão da UBS para usar o QR Code.</div>
+    </footer>
+  </div>
+
+<script>
+// -----------------------------
+// CONFIGURAÇÃO: perguntas (pt-BR)
+// Substitua 'folder.pdf' pela URL do seu PDF (de preferência endereço absoluto hospedado)
+const PDF_URL = 'folder.pdf'; // <- substituir pelo arquivo real
+
+const QUESTIONS = [
+  {q:'Qual é a principal forma de detectar precocemente o câncer de mama?',
+   opts:['Autoexame uma vez por mês','Mamografia anual a partir de 50 anos','Tomografia'],
+   correct:1,
+   audio: 'Pergunta um: qual é a principal forma de detectar precocemente o câncer de mama? Alternativa A: autoexame uma vez por mês. Alternativa B: mamografia anual a partir dos cinquenta anos. Alternativa C: tomografia.'
+  },
+  {q:'O autoexame das mamas deve ser feito…',
+   opts:['Para substituir a mamografia','Como complemento, ajudando a conhecer o corpo','Apenas quando há dor'],
+   correct:1,
+   audio: 'O autoexame das mamas deve ser feito como? Alternativa A: para substituir a mamografia. Alternativa B: como complemento, ajudando a conhecer o corpo. Alternativa C: apenas quando há dor.'
+  },
+  {q:'Qual destes NÃO é um sinal de alerta nas mamas?',
+   opts:['Nódulo endurecido','Saída de líquido pelo mamilo','Coceira leve ocasional'],
+   correct:2,
+   audio: 'Qual destas não é um sinal de alerta nas mamas? Alternativa A: nódulo endurecido. Alternativa B: saída de líquido pelo mamilo. Alternativa C: coceira leve ocasional.'
+  },
+  {q:'O câncer de mama pode acontecer em homens?',
+   opts:['Sim, mas é raro','Não','Apenas acima de 80 anos'],
+   correct:0,
+   audio: 'O câncer de mama pode acontecer em homens? Alternativa A: sim, mas é raro. Alternativa B: não. Alternativa C: apenas acima de oitenta anos.'
+  },
+  {q:'Um dos principais fatores de risco para câncer de mama é:',
+   opts:['Alimentação saudável','Histórico familiar da doença','Beber bastante água'],
+   correct:1,
+   audio: 'Um dos principais fatores de risco para o câncer de mama é: alternativa A, alimentação saudável. Alternativa B, histórico familiar da doença. Alternativa C, beber bastante água.'
+  },
+  {q:'Sobre prevenção, é correto afirmar:',
+   opts:['Exercícios não influenciam','Manter peso saudável reduz o risco','Evitar banho quente previne'],
+   correct:1,
+   audio: 'Sobre prevenção, é correto afirmar: alternativa A, exercícios não influenciam. Alternativa B, manter peso saudável reduz o risco. Alternativa C, evitar banho quente previne.'
+  },
+  {q:'Quando procurar a UBS imediatamente?',
+   opts:['Apenas se houver dor','Ao notar um nódulo novo ou alteração na mama','Se tiver febre'],
+   correct:1,
+   audio: 'Quando procurar a unidade de saúde imediatamente? Alternativa A: apenas se houver dor. Alternativa B: ao notar um nódulo novo ou alteração na mama. Alternativa C: se tiver febre.'
+  },
+  {q:'A mamografia dói?',
+   opts:['Sempre','Pode incomodar, mas é rápida e segura','Nunca'],
+   correct:1,
+   audio: 'A mamografia dói? Alternativa A: sempre. Alternativa B: pode incomodar, mas é rápida e segura. Alternativa C: nunca.'
+  },
+  {q:'O SUS oferece mamografia para mulheres de 50 a 69 anos?',
+   opts:['Não','Sim, gratuitamente','Apenas com encaminhamento particular'],
+   correct:1,
+   audio: 'O SUS oferece mamografia para mulheres de cinquenta a sessenta e nove anos? Alternativa A: não. Alternativa B: sim, gratuitamente. Alternativa C: apenas com encaminhamento particular.'
+  },
+  {q:'O diagnóstico precoce aumenta as chances de cura para:',
+   opts:['20%','50%','Mais de 90%'],
+   correct:2,
+   audio: 'O diagnóstico precoce aumenta as chances de cura para: alternativa A, vinte por cento. Alternativa B, cinquenta por cento. Alternativa C, mais de noventa por cento.'
+  }
+];
+
+// -----------------------------
+// Estado do jogo
+let currentIndex = 0; // pergunta atual (0..9)
+let score = 0;
+let voices = [];
+
+// -----------------------------
+// Helpers TTS
+function populateVoices(){
+  voices = speechSynthesis.getVoices();
+}
+
+function choosePTBRVoice(){
+  // tenta escolher uma voz pt-BR feminina
+  if(!voices || voices.length===0) populateVoices();
+  const pt = voices.filter(v=>/pt|português|brazil/i.test(v.lang+v.name+v.voiceURI));
+  if(pt.length){
+    // prefer names that often map to female voices
+    const prefer = pt.find(v=>/female|voz feminina|Camila|Francisca|Luciana|Isabela|Vitoria|Vitoria|Sofia|Helena|Raquel|Bruna/i.test(v.name)) || pt[0];
+    return prefer;
+  }
+  return voices[0]||null;
+}
+
+function speak(text){
+  if(!('speechSynthesis' in window)) return; // browser doesn't support
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  const v = choosePTBRVoice();
+  if(v) u.voice = v;
+  u.lang = 'pt-BR';
+  u.rate = 0.95;
+  u.pitch = 1.0;
+  speechSynthesis.speak(u);
+}
+
+// -----------------------------
+// UI render
+const boardEl = document.getElementById('board');
+const qText = document.getElementById('questionText');
+const answersEl = document.getElementById('answers');
+const scoreEl = document.getElementById('score');
+const feedbackEl = document.getElementById('feedback');
+const playAudioBtn = document.getElementById('playAudio');
+const replayAudioBtn = document.getElementById('replayAudio');
+const downloadLink = document.getElementById('downloadLink');
+
+function renderBoard(){
+  boardEl.innerHTML = '';
+  for(let i=0;i<10;i++){
+    const div = document.createElement('div');
+    div.className = 'cell'+(i<score? ' done' : (i===score ? '' : ' locked'));
+    div.innerHTML = `<div style="font-size:12px">Casa ${i+1}</div><div style="font-size:13px;font-weight:700">${i<score? '✓':''}</div>`;
+    boardEl.appendChild(div);
+  }
+}
+
+function renderQuestion(){
+  const item = QUESTIONS[currentIndex];
+  qText.textContent = `Pergunta ${currentIndex+1}: ${item.q}`;
+  answersEl.innerHTML = '';
+  item.opts.forEach((opt, idx)=>{
+    const b = document.createElement('button');
+    b.className='btn';
+    b.textContent = String.fromCharCode(65+idx)+'. '+opt;
+    b.setAttribute('data-idx', idx);
+    b.addEventListener('click', onAnswer);
+    answersEl.appendChild(b);
+  });
+  feedbackEl.textContent = '';
+}
+
+function onAnswer(e){
+  const idx = Number(e.currentTarget.getAttribute('data-idx'));
+  const item = QUESTIONS[currentIndex];
+  // disable buttons
+  Array.from(answersEl.children).forEach(el=>el.disabled=true);
+
+  if(idx === item.correct){
+    e.currentTarget.classList.add('correct');
+    feedbackEl.textContent = 'Resposta correta! Você avança uma casa.';
+    score++;
+    scoreEl.textContent = score;
+    renderBoard();
+    // check if finished
+    if(score>=10){
+      finishGame();
+      speak('Parabéns! Você completou o Caminho Rosa. Agora você pode baixar o folder informativo.');
+      return;
+    }
+    // avança para próxima pergunta (próxima não necessariamente é a próxima do array para evitar ordem fixa?)
+    currentIndex = Math.min(QUESTIONS.length-1, currentIndex+1);
+    // curto delay antes de renderizar próxima
+    setTimeout(()=>{
+      renderQuestion();
+      speak(QUESTIONS[currentIndex].audio);
+    },900);
+  } else {
+    e.currentTarget.classList.add('wrong');
+    feedbackEl.textContent = 'Resposta incorreta. Informação: ' + getShortExplanation(currentIndex);
+    // narra explicação
+    speak('Resposta incorreta. '+getShortExplanation(currentIndex));
+    // mantém mesma pergunta ou avança? Mantemos mesma pergunta para dar chance de aprender
+    // reabilita botões após breve atraso
+    setTimeout(()=>{
+      Array.from(answersEl.children).forEach(el=>el.disabled=false);
+    },900);
+  }
+}
+
+function getShortExplanation(i){
+  const ex = [
+    'A mamografia é o exame indicado para rastreamento em mulheres de cinquenta a sessenta e nove anos.',
+    'O autoexame é complemento para conhecer o próprio corpo e detectar alterações entre consultas.',
+    'Coceira leve ocasional costuma não ser sinal isolado de câncer, já nódulos e saída de líquido merecem investigação.',
+    'Homens também podem ter câncer de mama, embora seja raro.',
+    'Histórico familiar de câncer de mama aumenta o risco e deve ser comunicado ao profissional de saúde.',
+    'Manter peso saudável e atividade física reduzem o risco de diversos tipos de câncer, inclusive o de mama.',
+    'Se notar um nódulo novo ou alteração na mama, procure a unidade de saúde.',
+    'A mamografia pode incomodar, mas é um exame rápido e essencial.',
+    'Sim — o SUS oferece mamografia para mulheres entre 50 e 69 anos, gratuitamente.',
+    'O diagnóstico precoce aumenta muito as chances de cura, podendo superar 90 por cento em alguns casos.'
+  ];
+  return ex[i]||'';
+}
+
+function finishGame(){
+  // mostrar link para download
+  downloadLink.href = PDF_URL;
+  downloadLink.style.display = 'inline-block';
+  feedbackEl.textContent = 'Parabéns! Você completou todas as casas. Clique em "Baixar Folder" para receber o informativo.';
+}
+
+// Inicialização
+function init(){
+  // preencher board
+  renderBoard();
+  renderQuestion();
+  scoreEl.textContent = score;
+  // pre-carrega vozes
+  populateVoices();
+  if (typeof speechSynthesis !== 'undefined') {
+    // alguns navegadores carregam vozes assincronamente
+    speechSynthesis.onvoiceschanged = () => { populateVoices(); };
+  }
+  // play first audio automaticamente to help não alfabetizados (com cuidado: muitos navegadores bloqueiam autoplay)
+  setTimeout(()=>{
+    try{ speak(QUESTIONS[currentIndex].audio); }catch(e){}
+  },600);
+}
+
+// Botões de áudio
+playAudioBtn.addEventListener('click', ()=>{
+  speak(QUESTIONS[currentIndex].audio);
+});
+replayAudioBtn.addEventListener('click', ()=>{
+  speak(QUESTIONS[currentIndex].audio);
+});
+
+// Start
+init();
+</script>
+</body>
+</html>
